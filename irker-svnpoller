@@ -47,6 +47,10 @@ IRKER_PORT = 6659
 # need to change this.
 TEMPLATE = "%(bold)s%(project)s:%(bold)s %(green)s%(author)s%(reset)s * r%(bold)s%(revision)s%(bold)s /%(files)s%(bold)s:%(bold)s %(log)s"
 
+# The template used for continuation lines for full commit
+# messages.
+TEMPLATE_BODY = "%(bold)s%(project)s:%(bold)s %(line)s"
+
 # No user-serviceable parts below this line.
 
 debug = False
@@ -59,6 +63,7 @@ class IrkerSVNSource:
         self.repository = repository
         self._client = pysvn.Client()
         self._template = TEMPLATE
+        self._body_template = TEMPLATE_BODY
 
     def generate_notification(self, revision):
         "Generate a message for irkerd deliver from the given commit."
@@ -75,7 +80,13 @@ class IrkerSVNSource:
             if COMMIT_SUBJECTS_ONLY:
                 message = log['message'].splitlines()[0]
             else:
-                message = "\n" + log['message']
+                message = ''
+                for line in log['message'].splitlines():
+                    message = message + "\n" + self._body_template % {
+                        'bold': '\x02',
+                        'project': self.project,
+                        'line': line
+                    }
         else:
             message = '<Missing commit message>'
         msg = self._template % {
