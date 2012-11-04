@@ -98,6 +98,9 @@ class IrkerSVNSource:
                 format_vars['project'] = self.project
                 line_count = 0
                 for line in log['message'].splitlines():
+                    # Skip empty lines.
+                    if line.strip() == '':
+                        continue
                     line_count = line_count + 1
                     # Always let the subject line through.
                     if line_count > MAX_COMMIT_BODY_LINES + 1:
