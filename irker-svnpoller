@@ -51,6 +51,9 @@ TEMPLATE = "%(bold)s%(project)s:%(bold)s %(green)s%(author)s%(reset)s * r%(bold)
 # messages.
 TEMPLATE_BODY = "%(bold)s%(project)s:%(bold)s %(line)s"
 
+# The template used for the "(Log message trimmed)" line.
+TEMPLATE_TRIMMED = "%(bold)s%(project)s:%(bold)s %(gray)s(Log message trimmed.)"
+
 # No user-serviceable parts below this line.
 
 debug = False
@@ -61,6 +64,7 @@ IRC_FORMAT_CONSTANTS = {
     'green': '\x033',
     'blue': '\x032',
     'yellow': '\x037',
+    'gray': '\x0314',
     'reset': '\x0F',
 }
 
@@ -72,6 +76,7 @@ class IrkerSVNSource:
         self._client = pysvn.Client()
         self._template = TEMPLATE
         self._body_template = TEMPLATE_BODY
+        self._trim_template = TEMPLATE_TRIMMED
 
     def generate_notification(self, revision):
         "Generate a message for irkerd deliver from the given commit."
@@ -88,12 +93,21 @@ class IrkerSVNSource:
             if COMMIT_SUBJECTS_ONLY:
                 message = log['message'].splitlines()[0]
             else:
-                message = ''
+                message_lines = []
                 format_vars = IRC_FORMAT_CONSTANTS
                 format_vars['project'] = self.project
+                line_count = 0
                 for line in log['message'].splitlines():
+                    line_count = line_count + 1
+                    # Always let the subject line through.
+                    if line_count > MAX_COMMIT_BODY_LINES + 1:
+                        message_lines.append(self._trim_template % format_vars)
+                        break
                     format_vars['line'] = line
-                    message = message + "\n" + self._body_template % format_vars
+                    message_lines.append(self._body_template % format_vars)
+                # Force a newline at the start when showing full commits,
+                # so the stat summary and the subject are on different lines.
+                message = "\n" + "\n".join(message_lines)
         else:
             message = '<Missing commit message>'
         format_vars = IRC_FORMAT_CONSTANTS
@@ -153,16 +167,7 @@ class IrkerSVNSource:
 
 def deliver_to_irker(uri, message):
     "Delivers the given notification for a single channel to irkerd."
-    lines = []
-    for line in message.splitlines():
-        line = line.strip()
-        if line:
-            if len(lines) > MAX_COMMIT_BODY_LINES + 1:
-                if MAX_COMMIT_BODY_LINES != 0:
-                    lines.append("(Log message trimmed.)")
-                break
-            lines.append(line)
-    envelope = json.dumps({ "to": uri, "privmsg": "\n".join(lines) })
+    envelope = json.dumps({ "to": uri, "privmsg": message })
     if debug:
         print envelope
     if not simulate:
