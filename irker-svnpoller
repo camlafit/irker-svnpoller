@@ -56,6 +56,14 @@ TEMPLATE_BODY = "%(bold)s%(project)s:%(bold)s %(line)s"
 debug = False
 simulate = False
 
+IRC_FORMAT_CONSTANTS = {
+    'bold': '\x02',
+    'green': '\x033',
+    'blue': '\x032',
+    'yellow': '\x037',
+    'reset': '\x0F',
+}
+
 class IrkerSVNSource:
     "Represents a SVN repository from which irker notifications are generated."
     def __init__(self, project, repository):
@@ -81,20 +89,15 @@ class IrkerSVNSource:
                 message = log['message'].splitlines()[0]
             else:
                 message = ''
+                format_vars = IRC_FORMAT_CONSTANTS
+                format_vars['project'] = self.project
                 for line in log['message'].splitlines():
-                    message = message + "\n" + self._body_template % {
-                        'bold': '\x02',
-                        'project': self.project,
-                        'line': line
-                    }
+                    format_vars['line'] = line
+                    message = message + "\n" + self._body_template % format_vars
         else:
             message = '<Missing commit message>'
-        msg = self._template % {
-            'bold': '\x02',
-            'green': '\x033',
-            'blue': '\x032',
-            'yellow': '\x037',
-            'reset': '\x0F',
+        format_vars = IRC_FORMAT_CONSTANTS
+        format_vars.update({
             'project': self.project,
             'branch': '', # unused for SVN
             'module': '', # unused for SVN
@@ -102,7 +105,8 @@ class IrkerSVNSource:
             'author': author,
             'log': message,
             'files': self._format_paths(log['changed_paths'])
-        }
+        })
+        msg = self._template % format_vars
         return msg
 
     def _format_paths(self, paths_dict):
