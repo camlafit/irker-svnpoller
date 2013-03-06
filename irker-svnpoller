@@ -58,6 +58,7 @@ TEMPLATE_TRIMMED = "%(bold)s%(project)s:%(bold)s %(gray)s(Log message trimmed.)"
 
 debug = False
 simulate = False
+rangemode = False
 
 IRC_FORMAT_CONSTANTS = {
     'bold': '\x02',
@@ -78,9 +79,30 @@ class IrkerSVNSource:
         self._body_template = TEMPLATE_BODY
         self._trim_template = TEMPLATE_TRIMMED
 
+    def list_revisions_since(self, revision):
+        "Return a list of all revisions on the remote repository newer than "
+        "the one specified, or an empty list if there are no such."
+        if type(revision) != type(int()):
+            revision = int(revision)
+        log = self._client.log(
+                self.repository,
+                pysvn.Revision(pysvn.opt_revision_kind.head),
+                pysvn.Revision(pysvn.opt_revision_kind.head),
+                True)[0]
+        if not log:
+            sys.stderr.write("Could not fetch HEAD revision info for %s\n" %
+                    self.repository)
+            return []
+        head = log['revision'].number
+        if head <= revision:
+            sys.stderr.write("Revision %d is greater than HEAD (%d)\n" %
+                    revision, head)
+            return []
+        return range(revision + 1, head + 1)
+
     def generate_notification(self, revision):
         "Generate a message for irkerd deliver from the given commit."
-        if revision.upper() == 'HEAD':
+        if type(revision) != type(int()) and revision.upper() == 'HEAD':
             revobj = pysvn.Revision(pysvn.opt_revision_kind.head)
         else:
             revobj = pysvn.Revision(pysvn.opt_revision_kind.number, revision)
@@ -188,6 +210,8 @@ if __name__ == '__main__':
                         help="show extra debugging information")
     parser.add_argument('-n', action='store_true', dest='simulate',
                         help="simulate, don't send anything to irker")
+    parser.add_argument('-r', action='store_true', dest='rangemode',
+                        help="deliver notifications for all revisions newer than the specified revision up to HEAD")
     parser.add_argument('project_id')
     parser.add_argument('repository_URI')
     parser.add_argument('revision_or_HEAD')
@@ -195,11 +219,18 @@ if __name__ == '__main__':
     args = parser.parse_args()
     debug = args.debug
     simulate = args.simulate
+    rangemode = args.rangemode
     source = IrkerSVNSource(args.project_id, args.repository_URI)
     try:
-        message = source.generate_notification(args.revision_or_HEAD)
-        for uri in args.channel_URI:
-            deliver_to_irker(uri, message)
+        rev_range = []
+        if rangemode:
+            rev_range = source.list_revisions_since(args.revision_or_HEAD)
+        else:
+            rev_range = [ args.revision_or_HEAD ]
+        for rev in rev_range:
+            message = source.generate_notification(rev)
+            for uri in args.channel_URI:
+                deliver_to_irker(uri, message)
     except pysvn.ClientError, e:
         sys.stderr.write("pysvn.ClientError: %s\n" % e.message)
 
