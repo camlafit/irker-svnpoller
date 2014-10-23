@@ -71,11 +71,11 @@ IRC_FORMAT_CONSTANTS = {
 
 class IrkerSVNSource:
     "Represents a SVN repository from which irker notifications are generated."
-    def __init__(self, project, repository):
+    def __init__(self, project, repository, template):
         self.project = project
         self.repository = repository
         self._client = pysvn.Client()
-        self._template = TEMPLATE
+        self._template = template
         self._body_template = TEMPLATE_BODY
         self._trim_template = TEMPLATE_TRIMMED
 
@@ -214,6 +214,8 @@ if __name__ == '__main__':
                         help="deliver notifications for all revisions newer than the specified revision up to HEAD")
     parser.add_argument('--subject-only', action='store_true',dest='commit_subject_only',
                         help="Send only subject commit")
+    parser.add_argument('--template', default=TEMPLATE,
+                        help="Format commit message to post")
     parser.add_argument('project_id')
     parser.add_argument('repository_URI')
     parser.add_argument('revision_or_HEAD')
@@ -222,7 +224,8 @@ if __name__ == '__main__':
     debug = args.debug
     simulate = args.simulate
     rangemode = args.rangemode
-    source = IrkerSVNSource(args.project_id, args.repository_URI)
+
+    source = IrkerSVNSource(args.project_id, args.repository_URI, args.template)
     try:
         rev_range = []
         if rangemode:
