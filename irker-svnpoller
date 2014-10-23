@@ -100,7 +100,7 @@ class IrkerSVNSource:
             return []
         return range(revision + 1, head + 1)
 
-    def generate_notification(self, revision):
+    def generate_notification(self, revision, commit_subject_only=COMMIT_SUBJECTS_ONLY):
         "Generate a message for irkerd deliver from the given commit."
         if type(revision) != type(int()) and revision.upper() == 'HEAD':
             revobj = pysvn.Revision(pysvn.opt_revision_kind.head)
@@ -112,7 +112,7 @@ class IrkerSVNSource:
         else:
             author = '<Unknown>'
         if 'message' in log:
-            if COMMIT_SUBJECTS_ONLY:
+            if commit_subject_only:
                 message = log['message'].splitlines()[0]
             else:
                 message_lines = []
@@ -212,6 +212,8 @@ if __name__ == '__main__':
                         help="simulate, don't send anything to irker")
     parser.add_argument('-r', action='store_true', dest='rangemode',
                         help="deliver notifications for all revisions newer than the specified revision up to HEAD")
+    parser.add_argument('--subject-only', action='store_true',dest='commit_subject_only',
+                        help="Send only subject commit")
     parser.add_argument('project_id')
     parser.add_argument('repository_URI')
     parser.add_argument('revision_or_HEAD')
@@ -228,7 +230,7 @@ if __name__ == '__main__':
         else:
             rev_range = [ args.revision_or_HEAD ]
         for rev in rev_range:
-            message = source.generate_notification(rev)
+            message = source.generate_notification(rev,args.commit_subject_only)
             deliver_to_irker(args.channel_URI, message)
     except pysvn.ClientError, e:
         sys.stderr.write("pysvn.ClientError: %s\n" % e.message)
