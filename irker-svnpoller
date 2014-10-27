@@ -71,13 +71,14 @@ IRC_FORMAT_CONSTANTS = {
 
 class IrkerSVNSource:
     "Represents a SVN repository from which irker notifications are generated."
-    def __init__(self, project, repository, template):
+    def __init__(self, project, repository, template, urlprefix):
         self.project = project
         self.repository = repository
         self._client = pysvn.Client()
         self._template = template
         self._body_template = TEMPLATE_BODY
         self._trim_template = TEMPLATE_TRIMMED
+        self.urlprefix = urlprefix
 
     def list_revisions_since(self, revision):
         "Return a list of all revisions on the remote repository newer than "
@@ -143,7 +144,8 @@ class IrkerSVNSource:
             'revision': log['revision'].number,
             'author': author,
             'log': message,
-            'files': self._format_paths(log['changed_paths'])
+            'files': self._format_paths(log['changed_paths']),
+            'urlprefix': self.urlprefix
         })
         msg = self._template % format_vars
         return msg
@@ -216,6 +218,8 @@ if __name__ == '__main__':
                         help="Send only subject commit")
     parser.add_argument('--template-subject', default=TEMPLATE,
                         help="Format subject commit message (first line)")
+    parser.add_argument('--urlprefix', default='r',
+                        help="Changeset URL prefix for your repo")
     parser.add_argument('project_id')
     parser.add_argument('repository_URI')
     parser.add_argument('revision_or_HEAD')
@@ -225,7 +229,7 @@ if __name__ == '__main__':
     simulate = args.simulate
     rangemode = args.rangemode
 
-    source = IrkerSVNSource(args.project_id, args.repository_URI, args.template-subject)
+    source = IrkerSVNSource(args.project_id, args.repository_URI, args.template, args.urlprefix)
     try:
         rev_range = []
         if rangemode:
